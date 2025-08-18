@@ -124,20 +124,23 @@ class RFDevice:
 
     def _find_gpio_chip(self) -> str | None:
         """Find the correct GPIO chip for different Raspberry Pi versions."""
+        _LOGGER.info("Searching for GPIO chip...")
         # rpi3,4 typically use gpiochip0, rpi5 uses gpiochip4
         for chip_num in [0, 4, 1, 2, 3, 5]:
             chip_path = f"/dev/gpiochip{chip_num}"
+            _LOGGER.debug("Trying GPIO chip: %s", chip_path)
             try:
                 with gpiod.Chip(chip_path) as chip:
                     info = chip.get_info()
+                    _LOGGER.debug("Chip %s: label='%s', lines=%d", chip_path, info.label, info.num_lines)
                     # Look for chips that contain "pinctrl" in the label
                     if "pinctrl" in info.label.lower():
-                        _LOGGER.debug("Found suitable GPIO chip: %s (%s)", chip_path, info.label)
+                        _LOGGER.info("Found suitable GPIO chip: %s (%s)", chip_path, info.label)
                         return chip_path
-            except Exception:
-                # Chip doesn't exist or can't be opened, try next
+            except Exception as err:
+                _LOGGER.debug("Chip %s not available: %s", chip_path, err)
                 continue
-        _LOGGER.error("No suitable GPIO chip found")
+        _LOGGER.error("No suitable GPIO chip found. Available chips may not contain 'pinctrl' in label.")
         return None
 
     def cleanup(self) -> None:
@@ -160,6 +163,7 @@ class RFDevice:
             _LOGGER.error("RX is enabled, not enabling TX")
             return False
         if not self.tx_enabled:
+            _LOGGER.info("Enabling TX on GPIO %d using chip %s", self.gpio, self._gpio_chip_path)
             try:
                 if self._gpio_request:
                     self._gpio_request.release()
@@ -172,9 +176,9 @@ class RFDevice:
                     )}
                 )
                 self.tx_enabled = True
-                _LOGGER.debug("TX enabled")
+                _LOGGER.info("TX enabled successfully on GPIO %d", self.gpio)
             except Exception as err:
-                _LOGGER.error("Failed to enable TX: %s", err)
+                _LOGGER.error("Failed to enable TX on GPIO %d: %s", self.gpio, err)
                 return False
         return True
 

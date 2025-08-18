@@ -64,14 +64,26 @@ def setup_platform(
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Find and return switches controlled by a generic RF device via GPIO."""
-
+    import logging
+    _LOGGER = logging.getLogger(__name__)
+    
     gpio = config[CONF_GPIO]
-    rfdevice = RFDevice(gpio)
+    _LOGGER.info("Setting up ha_rf platform with GPIO %d", gpio)
+    
+    try:
+        rfdevice = RFDevice(gpio)
+        _LOGGER.info("RFDevice initialized successfully")
+    except Exception as err:
+        _LOGGER.error("Failed to initialize RFDevice: %s", err)
+        _LOGGER.error("This likely means gpiod is not available or GPIO permissions are insufficient")
+        return
+        
     rfdevice_lock = RLock()
     switches = config[CONF_SWITCHES]
 
     devices = []
     for dev_name, properties in switches.items():
+        _LOGGER.info("Creating switch: %s", dev_name)
         devices.append(
             RPiRFSwitch(
                 properties.get(CONF_NAME, dev_name),
@@ -86,9 +98,17 @@ def setup_platform(
                 properties.get(CONF_CODE_OFF),
             )
         )
+    
     if devices:
-        rfdevice.enable_tx()
+        _LOGGER.info("Enabling TX for %d devices", len(devices))
+        try:
+            rfdevice.enable_tx()
+            _LOGGER.info("TX enabled successfully")
+        except Exception as err:
+            _LOGGER.error("Failed to enable TX: %s", err)
+            return
 
+    _LOGGER.info("Adding %d entities to Home Assistant", len(devices))
     add_entities(devices)
 
     hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, lambda event: rfdevice.cleanup())
