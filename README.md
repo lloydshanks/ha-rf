@@ -128,9 +128,14 @@ To customize: Go to **Settings** → **Devices & Services** → **Entities**, fi
 ### Getting RF Codes
 
 You can capture RF codes using tools like:
-- [rpi-rf](https://pypi.org/project/rpi-rf/) command line tools
+- **Flipper Zero** - Use the Sub-GHz app to capture and analyze RF signals
 - [rc-switch](https://github.com/sui77/rc-switch) with Arduino
 - RTL-SDR dongles with software like rtl_433
+
+### Hardware Modules
+
+You can purchase 433MHz RF modules from various suppliers:
+- [433MHz RF Wireless Transmitter Receiver Kit FS1000A](https://zaitronics.com.au/products/433mhz-rf-wireless-transmitter-receiver-kit-fs1000a) - Example kit from Zaitronics
 
 ## Development
 
