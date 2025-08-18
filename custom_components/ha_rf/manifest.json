@@ -7,6 +7,6 @@
   "issue_tracker": "https://github.com/lloydshanks/ha-rf/issues",
   "integration_type": "device",
   "quality_scale": "silver",
-  "requirements": ["rpi-lgpio>=0.6"],
+  "requirements": ["gpiod>=2.3.0"],
   "version": "2025.8.2"
 }

@@ -8,7 +8,7 @@ This integration provides a `ha_rf` switch platform that allows you to control d
 
 - **Python 3.13 Ready**: Updated for modern Python versions and Home Assistant Core 2025.8+
 - **Embedded RF Module**: No external rpi-rf dependency - all RF functionality built-in
-- **Modern GPIO Support**: Uses rpi-lgpio for better compatibility
+- **Modern GPIO Support**: Uses gpiod (libgpiod) for Python 3.13 compatibility
 - **Unique Entity IDs**: Full Home Assistant entity customization support
 - **Multiple Protocols**: Support for various RF protocols and configurations
 
@@ -120,10 +120,18 @@ To customize: Go to **Settings** → **Devices & Services** → **Entities**, fi
 
 ### Common Issues
 
-- **ImportError about GPIO**: Ensure you're running on a Raspberry Pi with GPIO support
+- **ImportError about gpiod**: Ensure gpiod>=2.3.0 is installed. This should happen automatically through HACS.
 - **Permission denied on GPIO**: Home Assistant needs GPIO access permissions
+- **No suitable GPIO chip found**: Ensure you're running on a supported Raspberry Pi (3, 4, or 5)
 - **Device not responding**: Check wiring and RF codes
 - **Entity not appearing**: Verify configuration syntax and restart Home Assistant
+
+### GPIO Requirements
+
+This integration requires:
+- A supported Raspberry Pi (3, 4, or 5) with GPIO access
+- The `gpiod` Python library (automatically installed via requirements)
+- Proper GPIO permissions for Home Assistant
 
 ### Getting RF Codes
 
@@ -156,9 +164,10 @@ uv run mypy custom_components/
 ## Compatibility
 
 - **Home Assistant**: 2025.8.0+
-- **Python**: 3.12+ (recommended 3.13+)
-- **Hardware**: Raspberry Pi with GPIO
+- **Python**: 3.12+ (required 3.13+ for HA 2025.2+)
+- **Hardware**: Raspberry Pi 3, 4, or 5 with GPIO
 - **RF Modules**: 433MHz/315MHz transmitters
+- **GPIO Library**: gpiod>=2.3.0 (libgpiod)
 
 ## Migration from Original rpi_rf
 
