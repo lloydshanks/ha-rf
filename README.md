@@ -9,6 +9,10 @@ This integration provides a `ha_rf` switch platform that allows you to control d
 - **Python 3.13 Ready**: Updated for modern Python versions and Home Assistant Core 2025.8+
 - **Embedded RF Module**: No external rpi-rf dependency - all RF functionality built-in
 - **Modern GPIO Support**: Uses gpiod (libgpiod) for Python 3.13 compatibility
+- **Raspberry Pi 5 Compatible**: Auto-detects Pi 3/4 (gpiochip0) vs Pi 5 (gpiochip4) GPIO chips
+- **High-Precision Timing**: Microsecond-accurate RF transmission for better reliability
+- **Enhanced GPIO Detection**: Robust chip detection with fallback mechanisms
+- **Per-Entity Configuration**: Individual pulse length, protocol, and repetition settings per switch
 - **Unique Entity IDs**: Full Home Assistant entity customization support
 - **Multiple Protocols**: Support for various RF protocols and configurations
 
@@ -122,9 +126,11 @@ To customize: Go to **Settings** → **Devices & Services** → **Entities**, fi
 
 - **ImportError about gpiod**: Ensure gpiod>=2.3.0 is installed. This should happen automatically through HACS.
 - **Permission denied on GPIO**: Home Assistant needs GPIO access permissions
-- **No suitable GPIO chip found**: Ensure you're running on a supported Raspberry Pi (3, 4, or 5)
-- **Device not responding**: Check wiring and RF codes
+- **"No GPIO chip found that contains line X"**: Fixed in v2025.8.6+. Ensure you have the latest version.
+- **"module 'gpiod' has no attribute 'Line'"**: Fixed in v2025.8.7. Update to the latest version.
+- **Device not responding**: Check wiring and RF codes. Try adjusting `signal_repetitions` (default 10).
 - **Entity not appearing**: Verify configuration syntax and restart Home Assistant
+- **Inconsistent transmission**: The integration now uses high-precision timing for better reliability
 
 ### GPIO Requirements
 
@@ -160,6 +166,20 @@ uv run ruff format .
 # Type checking
 uv run mypy custom_components/
 ```
+
+## Recent Updates
+
+### v2025.8.7 (Current)
+- **Fixed**: gpiod API compatibility for production environments
+- **Fixed**: GPIO chip detection regression that prevented initialization
+- **Improved**: Robust GPIO detection following proven reference implementations
+
+### v2025.8.5 
+- **Enhanced**: RF protocol timing with microsecond precision for better reliability
+- **Added**: Per-entity signal repetitions and code length configuration
+- **Improved**: GPIO chip detection for Raspberry Pi 5 compatibility  
+- **Fixed**: Parameter logic bugs in transmission code
+- **Added**: Explicit GPIO electrical settings for stable transmission
 
 ## Compatibility
 
