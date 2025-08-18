@@ -123,8 +123,8 @@ class RFDevice:
         return True
 
     def _find_gpio_chip_for_line(self, line_offset: int) -> str | None:
-        """Find the correct GPIO chip that contains the specified GPIO line."""
-        _LOGGER.info("Searching for GPIO chip containing line %d...", line_offset)
+        """Find GPIO chip with pinctrl label (follows reference implementation pattern)."""
+        _LOGGER.debug("Auto discovering GPIO chip for line %d", line_offset)
         # rpi3,4 typically use gpiochip0, rpi5 uses gpiochip4
         for chip_num in [0, 4, 1, 2, 3, 5]:
             chip_path = f"/dev/gpiochip{chip_num}"
@@ -134,34 +134,18 @@ class RFDevice:
                     info = chip.get_info()
                     _LOGGER.debug("Chip %s: label='%s', lines=%d", chip_path, info.label, info.num_lines)
                     
-                    # Look for chips that contain "pinctrl" in the label
-                    if "pinctrl" not in info.label.lower():
-                        _LOGGER.debug("Chip %s does not contain 'pinctrl' in label, skipping", chip_path)
-                        continue
-                    
-                    # Test if this chip actually has the requested line
-                    try:
-                        test_request = gpiod.request_lines(
-                            chip_path,
-                            consumer="ha-rf-probe",
-                            config={line_offset: gpiod.LineSettings(
-                                direction=Direction.OUTPUT,
-                                bias=gpiod.Line.Bias.DISABLED,
-                                drive=gpiod.Line.Drive.PUSH_PULL
-                            )}
-                        )
-                        test_request.release()
-                        _LOGGER.info("Found suitable GPIO chip: %s (%s) with line %d", chip_path, info.label, line_offset)
+                    # Only require pinctrl in label (proven approach from reference implementations)
+                    if "pinctrl" in info.label.lower():
+                        _LOGGER.info("Found GPIO chip: %s (%s, %d lines)", chip_path, info.label, info.num_lines)
                         return chip_path
-                    except Exception as line_err:
-                        _LOGGER.debug("Chip %s doesn't have line %d: %s", chip_path, line_offset, line_err)
-                        continue
+                    else:
+                        _LOGGER.debug("Skipping %s - no pinctrl in label: %s", chip_path, info.label)
                         
             except Exception as err:
-                _LOGGER.debug("Chip %s not available: %s", chip_path, err)
+                _LOGGER.debug("Chip %s unavailable: %s", chip_path, err)
                 continue
                 
-        _LOGGER.error("No GPIO chip found that contains line %d", line_offset)
+        _LOGGER.error("No pinctrl GPIO chip found for line %d", line_offset)
         return None
 
     def cleanup(self) -> None:
