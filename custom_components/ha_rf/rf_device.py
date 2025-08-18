@@ -103,11 +103,11 @@ class RFDevice:
 
         with self._gpio_lock:
             if not self._gpio_initialized:
-                self._gpio_chip_path = self._find_gpio_chip()
+                self._gpio_chip_path = self._find_gpio_chip_for_line(self.gpio)
                 if not self._gpio_chip_path:
-                    raise RuntimeError("No suitable GPIO chip found")
+                    raise RuntimeError(f"No GPIO chip found that contains line {self.gpio}")
                 RFDevice._gpio_initialized = True
-                _LOGGER.debug("GPIO chip found at %s", self._gpio_chip_path)
+                _LOGGER.debug("GPIO chip found at %s for line %d", self._gpio_chip_path, self.gpio)
         _LOGGER.debug("Using GPIO %d", gpio)
 
     def _validate_protocol(self, protocol: int) -> bool:
@@ -122,9 +122,9 @@ class RFDevice:
             return False
         return True
 
-    def _find_gpio_chip(self) -> str | None:
-        """Find the correct GPIO chip for different Raspberry Pi versions."""
-        _LOGGER.info("Searching for GPIO chip...")
+    def _find_gpio_chip_for_line(self, line_offset: int) -> str | None:
+        """Find the correct GPIO chip that contains the specified GPIO line."""
+        _LOGGER.info("Searching for GPIO chip containing line %d...", line_offset)
         # rpi3,4 typically use gpiochip0, rpi5 uses gpiochip4
         for chip_num in [0, 4, 1, 2, 3, 5]:
             chip_path = f"/dev/gpiochip{chip_num}"
@@ -133,14 +133,35 @@ class RFDevice:
                 with gpiod.Chip(chip_path) as chip:
                     info = chip.get_info()
                     _LOGGER.debug("Chip %s: label='%s', lines=%d", chip_path, info.label, info.num_lines)
+                    
                     # Look for chips that contain "pinctrl" in the label
-                    if "pinctrl" in info.label.lower():
-                        _LOGGER.info("Found suitable GPIO chip: %s (%s)", chip_path, info.label)
+                    if "pinctrl" not in info.label.lower():
+                        _LOGGER.debug("Chip %s does not contain 'pinctrl' in label, skipping", chip_path)
+                        continue
+                    
+                    # Test if this chip actually has the requested line
+                    try:
+                        test_request = gpiod.request_lines(
+                            chip_path,
+                            consumer="ha-rf-probe",
+                            config={line_offset: gpiod.LineSettings(
+                                direction=Direction.OUTPUT,
+                                bias=gpiod.Line.Bias.DISABLED,
+                                drive=gpiod.Line.Drive.PUSH_PULL
+                            )}
+                        )
+                        test_request.release()
+                        _LOGGER.info("Found suitable GPIO chip: %s (%s) with line %d", chip_path, info.label, line_offset)
                         return chip_path
+                    except Exception as line_err:
+                        _LOGGER.debug("Chip %s doesn't have line %d: %s", chip_path, line_offset, line_err)
+                        continue
+                        
             except Exception as err:
                 _LOGGER.debug("Chip %s not available: %s", chip_path, err)
                 continue
-        _LOGGER.error("No suitable GPIO chip found. Available chips may not contain 'pinctrl' in label.")
+                
+        _LOGGER.error("No GPIO chip found that contains line %d", line_offset)
         return None
 
     def cleanup(self) -> None:
@@ -172,7 +193,9 @@ class RFDevice:
                     consumer="ha-rf-tx",
                     config={self.gpio: gpiod.LineSettings(
                         direction=Direction.OUTPUT,
-                        output_value=Value.INACTIVE
+                        output_value=Value.INACTIVE,
+                        bias=gpiod.Line.Bias.DISABLED,
+                        drive=gpiod.Line.Drive.PUSH_PULL
                     )}
                 )
                 self.tx_enabled = True
@@ -199,21 +222,26 @@ class RFDevice:
         tx_proto: int | None = None,
         tx_pulselength: int | None = None,
         tx_length: int | None = None,
+        tx_repeat: int | None = None,
     ) -> bool:
         """Send a decimal code.
 
         Optionally set protocol, pulselength and code length.
         When none given reset to default protocol, default pulselength and set code length to 24 bits.
         """
-        if tx_proto:
+        if tx_proto is not None:
             self.tx_proto = tx_proto
-        else:
-            self.tx_proto = 1
-        if tx_pulselength:
+        # else: keep existing self.tx_proto
+        
+        if tx_pulselength is not None:
+            if tx_pulselength <= 0:
+                _LOGGER.error("Invalid tx_pulselength: %d. Must be positive.", tx_pulselength)
+                return False
             self.tx_pulselength = tx_pulselength
         elif not self.tx_pulselength:
             self.tx_pulselength = PROTOCOLS[self.tx_proto].pulselength
-        if tx_length:
+            
+        if tx_length is not None:
             self.tx_length = tx_length
         elif self.tx_proto == 6:
             self.tx_length = 32
@@ -221,6 +249,14 @@ class RFDevice:
             self.tx_length = 32
         else:
             self.tx_length = 24
+            
+        # Handle per-transmission repetitions
+        effective_repeat = tx_repeat if tx_repeat is not None else self.tx_repeat
+            
+        # Log effective transmission parameters  
+        _LOGGER.debug("TX cfg proto=%d, pl=%dus, len=%d, repeat=%d", 
+                     self.tx_proto, self.tx_pulselength, self.tx_length, effective_repeat)
+                     
         rawcode = format(code, f"#0{self.tx_length + 2}b")[2:]
         if self.tx_proto == 6:
             nexacode = ""
@@ -232,12 +268,13 @@ class RFDevice:
             rawcode = nexacode
             self.tx_length = 64
         _LOGGER.debug("TX code: %d", code)
-        return self.tx_bin(rawcode)
+        return self.tx_bin(rawcode, effective_repeat)
 
-    def tx_bin(self, rawcode: str) -> bool:
+    def tx_bin(self, rawcode: str, tx_repeat: int | None = None) -> bool:
         """Send a binary code."""
         _LOGGER.debug("TX bin: %s", rawcode)
-        for _ in range(0, self.tx_repeat):
+        effective_repeat = tx_repeat if tx_repeat is not None else self.tx_repeat
+        for _ in range(0, effective_repeat):
             if self.tx_proto == 6:
                 if not self.tx_sync():
                     return False
@@ -375,9 +412,15 @@ class RFDevice:
 
         return False
 
-    def _sleep(self, delay: float) -> None:
-        """High precision sleep function."""
-        _delay = delay / 100
-        end = time.time() + delay - _delay
-        while time.time() < end:
-            time.sleep(_delay)
+    def _sleep(self, seconds: float) -> None:
+        """Busy-wait to achieve ~µs precision for RF timing."""
+        target_ns = int(seconds * 1_000_000_000)
+        start_ns = time.perf_counter_ns()
+        
+        # Yield once for long waits, then busy-wait for precision
+        if target_ns > 200_000:  # >0.2 ms
+            time.sleep((target_ns - 100_000) / 1_000_000_000)  # leave ~0.1 ms
+            
+        # Busy-wait for the remaining time to achieve microsecond precision
+        while (time.perf_counter_ns() - start_ns) < target_ns:
+            pass

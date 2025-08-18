@@ -62,10 +62,13 @@ Thumbs.db
 .ruff_cache/
 .pre-commit-cache/
 
-# Development/testing files
+# Test coverage and reports
+htmlcov/
+coverage.xml
+.coverage.*
+
+# Development/testing files (but keep actual test files)
 testing.py
-test_*.py
-*_test.py
 
 # Home Assistant specific
 *.log

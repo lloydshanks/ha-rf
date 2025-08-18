@@ -12,3 +12,24 @@ dev = [
     "pre-commit==4.3.0",
     "ruff==0.12.9",
 ]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-homeassistant-custom-component>=0.13.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = [
+    "--cov=custom_components.ha_rf",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=60",
+    "-v"
+]
+asyncio_mode = "auto"

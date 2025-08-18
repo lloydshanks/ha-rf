@@ -8,5 +8,5 @@
   "integration_type": "device",
   "quality_scale": "silver",
   "requirements": ["gpiod>=2.3.0"],
-  "version": "2025.8.4"
+  "version": "2025.8.5"
 }

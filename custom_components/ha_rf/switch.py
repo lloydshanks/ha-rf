@@ -141,9 +141,9 @@ class RPiRFSwitch(SwitchEntity):
         self._protocol = protocol
         self._pulselength = pulselength
         self._length = length
+        self._signal_repetitions = signal_repetitions
         self._code_on = code_on
         self._code_off = code_off
-        self._rfdevice.tx_repeat = signal_repetitions
 
     @property
     def should_poll(self) -> bool:
@@ -166,12 +166,13 @@ class RPiRFSwitch(SwitchEntity):
         protocol: int | None,
         pulselength: int | None,
         length: int | None,
+        signal_repetitions: int | None,
     ) -> bool:
-        """Send the code(s) with a specified pulselength."""
+        """Send the code(s) with specified parameters."""
         with self._lock:
             _LOGGER.info("Sending code(s): %s", code_list)
             for code in code_list:
-                if not self._rfdevice.tx_code(code, protocol, pulselength, length):
+                if not self._rfdevice.tx_code(code, protocol, pulselength, length, signal_repetitions):
                     _LOGGER.error("Failed to send code: %s", code)
                     return False
         return True
@@ -179,7 +180,7 @@ class RPiRFSwitch(SwitchEntity):
     def turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
         if self._send_code(
-            self._code_on, self._protocol, self._pulselength, self._length
+            self._code_on, self._protocol, self._pulselength, self._length, self._signal_repetitions
         ):
             self._state = True
             self.schedule_update_ha_state()
@@ -187,7 +188,7 @@ class RPiRFSwitch(SwitchEntity):
     def turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
         if self._send_code(
-            self._code_off, self._protocol, self._pulselength, self._length
+            self._code_off, self._protocol, self._pulselength, self._length, self._signal_repetitions
         ):
             self._state = False
             self.schedule_update_ha_state()
