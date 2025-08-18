@@ -9,6 +9,6 @@ dependencies = []
 [dependency-groups]
 dev = [
     "mypy==1.17.1",
-    "pre-commit==4.0.1",
+    "pre-commit==4.3.0",
     "ruff==0.12.9",
 ]
