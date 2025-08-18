@@ -1,0 +1,84 @@
+# Gitignore settings for ha-rf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# uv
+uv.lock
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.spyderproject
+.spyproject
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python tools
+.coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pre-commit-cache/
+
+# Development/testing files
+testing.py
+test_*.py
+*_test.py
+
+# Home Assistant specific
+*.log
+secrets.yaml
+known_devices.yaml
+home-assistant.log
+home-assistant_v2.db
+.uuid
+.cloud
+.storage/
+configuration.yaml
+automations.yaml
+scripts.yaml
+scenes.yaml
+groups.yaml
+customize.yaml

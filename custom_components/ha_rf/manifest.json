@@ -1,0 +1,12 @@
+{
+  "domain": "ha_rf",
+  "name": "Raspberry Pi RF Integration",
+  "codeowners": ["@lloydshanks"],
+  "documentation": "https://github.com/lloydshanks/ha-rf",
+  "iot_class": "assumed_state",
+  "issue_tracker": "https://github.com/lloydshanks/ha-rf/issues",
+  "integration_type": "device",
+  "quality_scale": "silver",
+  "requirements": ["rpi-lgpio>=0.6"],
+  "version": "2025.8.2"
+}
