@@ -3,9 +3,9 @@
   "name": "Raspberry Pi RF Integration",
   "codeowners": ["@lloydshanks"],
   "documentation": "https://github.com/lloydshanks/ha-rf",
+  "integration_type": "device",
   "iot_class": "assumed_state",
   "issue_tracker": "https://github.com/lloydshanks/ha-rf/issues",
-  "integration_type": "device",
   "quality_scale": "silver",
   "requirements": ["gpiod>=2.3.0"],
   "version": "2025.8.5"
