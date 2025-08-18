@@ -13,11 +13,13 @@ from collections import namedtuple
 
 try:
     import gpiod
-    from gpiod.line import Direction, Value
+    from gpiod.line import Direction, Value, Bias, Drive
 except ImportError as err:
     gpiod = None
     Direction = None
     Value = None
+    Bias = None
+    Drive = None
     _LOGGER = logging.getLogger(__name__)
     _LOGGER.warning(
         "gpiod not available: %s. RF functionality will not work. "
@@ -178,8 +180,8 @@ class RFDevice:
                     config={self.gpio: gpiod.LineSettings(
                         direction=Direction.OUTPUT,
                         output_value=Value.INACTIVE,
-                        bias=gpiod.Line.Bias.DISABLED,
-                        drive=gpiod.Line.Drive.PUSH_PULL
+                        bias=Bias.DISABLED,
+                        drive=Drive.PUSH_PULL
                     )}
                 )
                 self.tx_enabled = True
