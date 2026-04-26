@@ -70,6 +70,9 @@ coverage.xml
 # Development/testing files (but keep actual test files)
 testing.py
 
+# AI assistant project notes
+CLAUDE.md
+
 # Home Assistant specific
 *.log
 secrets.yaml
