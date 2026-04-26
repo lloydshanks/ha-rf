@@ -140,6 +140,9 @@ def setup_platform(
 class RPiRFSwitch(SwitchEntity):
     """Representation of a GPIO RF switch."""
 
+    _attr_assumed_state = True
+    _attr_should_poll = False
+
     def __init__(
         self,
         name: str,
@@ -169,11 +172,6 @@ class RPiRFSwitch(SwitchEntity):
         self._code_off = code_off
 
     @property
-    def should_poll(self) -> bool:
-        """No polling needed."""
-        return False
-
-    @property
     def name(self) -> str:
         """Return the name of the switch."""
         return self._name
@@ -183,20 +181,17 @@ class RPiRFSwitch(SwitchEntity):
         """Return true if device is on."""
         return self._state
 
-    def _send_code(
-        self,
-        code_list: list[int],
-        protocol: int | None,
-        pulselength: int | None,
-        length: int | None,
-        signal_repetitions: int | None,
-    ) -> bool:
-        """Send the code(s) with specified parameters."""
+    def _send_code(self, code_list: list[int]) -> bool:
+        """Send the code(s) using this switch's configured parameters."""
         with self._lock:
             _LOGGER.info("Sending code(s): %s", code_list)
             for code in code_list:
                 if not self._rfdevice.tx_code(
-                    code, protocol, pulselength, length, signal_repetitions
+                    code,
+                    tx_proto=self._protocol,
+                    tx_pulselength=self._pulselength,
+                    tx_length=self._length,
+                    tx_repeat=self._signal_repetitions,
                 ):
                     _LOGGER.error("Failed to send code: %s", code)
                     return False
@@ -204,24 +199,12 @@ class RPiRFSwitch(SwitchEntity):
 
     def turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
-        if self._send_code(
-            self._code_on,
-            self._protocol,
-            self._pulselength,
-            self._length,
-            self._signal_repetitions,
-        ):
+        if self._send_code(self._code_on):
             self._state = True
             self.schedule_update_ha_state()
 
     def turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
-        if self._send_code(
-            self._code_off,
-            self._protocol,
-            self._pulselength,
-            self._length,
-            self._signal_repetitions,
-        ):
+        if self._send_code(self._code_off):
             self._state = False
             self.schedule_update_ha_state()

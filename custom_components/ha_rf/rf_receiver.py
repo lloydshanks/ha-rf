@@ -13,8 +13,14 @@ import logging
 import threading
 import time
 
-import gpiod
-from gpiod.line import Bias, Direction, Edge
+try:
+    import gpiod
+    from gpiod.line import Bias, Direction, Edge
+except ImportError:
+    gpiod = None
+    Bias = None
+    Direction = None
+    Edge = None
 
 from .rf_device import MAX_CHANGES, PROTOCOLS
 
@@ -27,6 +33,8 @@ class RFReceiver:
     """Decodes RF pulse trains arriving on a GPIO line."""
 
     def __init__(self, gpio: int, chip_path: str, tolerance: int = 80) -> None:
+        if gpiod is None:
+            raise RuntimeError("gpiod is not available; cannot start RX listener")
         self._gpio = gpio
         self._chip_path = chip_path
         self._tolerance = tolerance

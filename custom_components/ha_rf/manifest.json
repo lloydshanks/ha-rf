@@ -8,5 +8,5 @@
   "issue_tracker": "https://github.com/lloydshanks/ha-rf/issues",
   "quality_scale": "silver",
   "requirements": ["gpiod>=2.3.0"],
-  "version": "2026.4.0"
+  "version": "2026.4.1"
 }
