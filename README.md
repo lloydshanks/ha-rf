@@ -120,6 +120,12 @@ To customize: Go to **Settings** → **Devices & Services** → **Entities**, fi
 
 2. Ensure your Home Assistant installation has GPIO access (typically requires running as root or in the `gpio` group)
 
+### Antenna
+
+For usable range, solder a **17.3 cm length of solid-core wire** to the `ANT` pad on the TX module. 17.3 cm is a quarter-wavelength at 433.92 MHz — without a real antenna the small coil that ships pre-attached on most cheap modules is just part of the tuning circuit and limits range to a few centimetres. The same applies to any RX module.
+
+If you're also running a receiver alongside the transmitter on the same Pi, place it **at least 30 cm from the TX module**. Cheap superregenerative receivers (e.g. MX-RM-5V) get heavily desensitised by their neighbour's transmissions and the AGC takes seconds to recover after each TX burst. Superheterodyne receivers (RXB6, WL101-341) tolerate closer colocation and are far more sensitive in general.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -128,9 +134,9 @@ To customize: Go to **Settings** → **Devices & Services** → **Entities**, fi
 - **Permission denied on GPIO**: Home Assistant needs GPIO access permissions
 - **"No GPIO chip found that contains line X"**: Fixed in v2025.8.6+. Ensure you have the latest version.
 - **"module 'gpiod' has no attribute 'Line'"**: Fixed in v2025.8.7. Update to the latest version.
-- **Device not responding**: Check wiring and RF codes. Try adjusting `signal_repetitions` (default 10).
+- **Device not responding**: Check wiring and RF codes. Try adjusting `signal_repetitions` (default 10). Also check antenna — without a 17 cm wire on the `ANT` pad, range is only a few cm.
 - **Entity not appearing**: Verify configuration syntax and restart Home Assistant
-- **Inconsistent transmission**: The integration now uses high-precision timing for better reliability
+- **Inconsistent transmission**: The integration uses microsecond-precision busy-waiting for pulse timing, and no logging is emitted inside the per-bit waveform path — so enabling `debug` log level for `custom_components.ha_rf` will not affect transmission timing.
 
 ### GPIO Requirements
 

@@ -60,7 +60,6 @@ class RFDevice:
     """Representation of a GPIO RF device."""
 
     _gpio_lock = threading.RLock()
-    _gpio_initialized = False
 
     def __init__(
         self,
@@ -74,7 +73,7 @@ class RFDevice:
         """Initialize the RF device."""
         if gpiod is None:
             raise RuntimeError("gpiod is not available. Cannot initialize RF device.")
-        
+
         self.gpio = gpio
         self.tx_enabled = False
         self.tx_proto = tx_proto
@@ -82,7 +81,7 @@ class RFDevice:
             self.tx_pulselength = tx_pulselength
         else:
             self.tx_pulselength = PROTOCOLS[tx_proto].pulselength
-        
+
         # gpiod-specific attributes
         self._gpio_chip = None
         self._gpio_request = None
@@ -104,12 +103,12 @@ class RFDevice:
         self.rx_pulselength = None
 
         with self._gpio_lock:
-            if not self._gpio_initialized:
-                self._gpio_chip_path = self._find_gpio_chip_for_line(self.gpio)
-                if not self._gpio_chip_path:
-                    raise RuntimeError(f"No GPIO chip found that contains line {self.gpio}")
-                RFDevice._gpio_initialized = True
-                _LOGGER.debug("GPIO chip found at %s for line %d", self._gpio_chip_path, self.gpio)
+            self._gpio_chip_path = self._find_gpio_chip_for_line(self.gpio)
+            if not self._gpio_chip_path:
+                raise RuntimeError(f"No GPIO chip found that contains line {self.gpio}")
+            _LOGGER.debug(
+                "GPIO chip found at %s for line %d", self._gpio_chip_path, self.gpio
+            )
         _LOGGER.debug("Using GPIO %d", gpio)
 
     def _validate_protocol(self, protocol: int) -> bool:
@@ -134,19 +133,33 @@ class RFDevice:
             try:
                 with gpiod.Chip(chip_path) as chip:
                     info = chip.get_info()
-                    _LOGGER.debug("Chip %s: label='%s', lines=%d", chip_path, info.label, info.num_lines)
-                    
+                    _LOGGER.debug(
+                        "Chip %s: label='%s', lines=%d",
+                        chip_path,
+                        info.label,
+                        info.num_lines,
+                    )
+
                     # Only require pinctrl in label (proven approach from reference implementations)
                     if "pinctrl" in info.label.lower():
-                        _LOGGER.info("Found GPIO chip: %s (%s, %d lines)", chip_path, info.label, info.num_lines)
+                        _LOGGER.info(
+                            "Found GPIO chip: %s (%s, %d lines)",
+                            chip_path,
+                            info.label,
+                            info.num_lines,
+                        )
                         return chip_path
                     else:
-                        _LOGGER.debug("Skipping %s - no pinctrl in label: %s", chip_path, info.label)
-                        
+                        _LOGGER.debug(
+                            "Skipping %s - no pinctrl in label: %s",
+                            chip_path,
+                            info.label,
+                        )
+
             except Exception as err:
                 _LOGGER.debug("Chip %s unavailable: %s", chip_path, err)
                 continue
-                
+
         _LOGGER.error("No pinctrl GPIO chip found for line %d", line_offset)
         return None
 
@@ -170,19 +183,23 @@ class RFDevice:
             _LOGGER.error("RX is enabled, not enabling TX")
             return False
         if not self.tx_enabled:
-            _LOGGER.info("Enabling TX on GPIO %d using chip %s", self.gpio, self._gpio_chip_path)
+            _LOGGER.info(
+                "Enabling TX on GPIO %d using chip %s", self.gpio, self._gpio_chip_path
+            )
             try:
                 if self._gpio_request:
                     self._gpio_request.release()
                 self._gpio_request = gpiod.request_lines(
                     self._gpio_chip_path,
                     consumer="ha-rf-tx",
-                    config={self.gpio: gpiod.LineSettings(
-                        direction=Direction.OUTPUT,
-                        output_value=Value.INACTIVE,
-                        bias=Bias.DISABLED,
-                        drive=Drive.PUSH_PULL
-                    )}
+                    config={
+                        self.gpio: gpiod.LineSettings(
+                            direction=Direction.OUTPUT,
+                            output_value=Value.INACTIVE,
+                            bias=Bias.DISABLED,
+                            drive=Drive.PUSH_PULL,
+                        )
+                    },
                 )
                 self.tx_enabled = True
                 _LOGGER.info("TX enabled successfully on GPIO %d", self.gpio)
@@ -218,15 +235,17 @@ class RFDevice:
         if tx_proto is not None:
             self.tx_proto = tx_proto
         # else: keep existing self.tx_proto
-        
+
         if tx_pulselength is not None:
             if tx_pulselength <= 0:
-                _LOGGER.error("Invalid tx_pulselength: %d. Must be positive.", tx_pulselength)
+                _LOGGER.error(
+                    "Invalid tx_pulselength: %d. Must be positive.", tx_pulselength
+                )
                 return False
             self.tx_pulselength = tx_pulselength
         elif not self.tx_pulselength:
             self.tx_pulselength = PROTOCOLS[self.tx_proto].pulselength
-            
+
         if tx_length is not None:
             self.tx_length = tx_length
         elif self.tx_proto == 6:
@@ -235,14 +254,19 @@ class RFDevice:
             self.tx_length = 32
         else:
             self.tx_length = 24
-            
+
         # Handle per-transmission repetitions
         effective_repeat = tx_repeat if tx_repeat is not None else self.tx_repeat
-            
-        # Log effective transmission parameters  
-        _LOGGER.debug("TX cfg proto=%d, pl=%dus, len=%d, repeat=%d", 
-                     self.tx_proto, self.tx_pulselength, self.tx_length, effective_repeat)
-                     
+
+        # Log effective transmission parameters
+        _LOGGER.debug(
+            "TX cfg proto=%d, pl=%dus, len=%d, repeat=%d",
+            self.tx_proto,
+            self.tx_pulselength,
+            self.tx_length,
+            effective_repeat,
+        )
+
         rawcode = format(code, f"#0{self.tx_length + 2}b")[2:]
         if self.tx_proto == 6:
             nexacode = ""
@@ -252,7 +276,8 @@ class RFDevice:
                 if b == "1":
                     nexacode = nexacode + "10"
             rawcode = nexacode
-            self.tx_length = 64
+            # Protocol 6 (Nexa) doubles every bit, so the wire length is 2× the original
+            self.tx_length = len(rawcode)
         _LOGGER.debug("TX code: %d", code)
         return self.tx_bin(rawcode, effective_repeat)
 
@@ -260,20 +285,42 @@ class RFDevice:
         """Send a binary code."""
         _LOGGER.debug("TX bin: %s", rawcode)
         effective_repeat = tx_repeat if tx_repeat is not None else self.tx_repeat
-        for _ in range(0, effective_repeat):
+
+        _LOGGER.debug(
+            "Starting transmission: repeat=%d, tx_enabled=%s",
+            effective_repeat,
+            self.tx_enabled,
+        )
+
+        if not self.tx_enabled:
+            _LOGGER.warning("TX not enabled, attempting to enable")
+            if not self.enable_tx():
+                _LOGGER.error("Failed to enable TX")
+                return False
+
+        # No debug logging inside the per-frame / per-bit loops below: even
+        # when DEBUG is disabled the call site has measurable overhead, and
+        # when enabled the formatting + handler dispatch easily blows the
+        # microsecond pulse budget. Setup-level debug (above) and error-only
+        # logging (below) are the safe places.
+        for repeat_num in range(0, effective_repeat):
             if self.tx_proto == 6:
                 if not self.tx_sync():
+                    _LOGGER.error("TX sync failed on repeat %d", repeat_num)
                     return False
             for byte in range(0, self.tx_length):
                 if rawcode[byte] == "0":
                     if not self.tx_l0():
+                        _LOGGER.error("TX bit 0 failed at position %d", byte)
                         return False
-                else:
-                    if not self.tx_l1():
-                        return False
+                elif not self.tx_l1():
+                    _LOGGER.error("TX bit 1 failed at position %d", byte)
+                    return False
             if not self.tx_sync():
+                _LOGGER.error("TX final sync failed on repeat %d", repeat_num)
                 return False
 
+        _LOGGER.debug("TX transmission completed successfully")
         return True
 
     def tx_l0(self) -> bool:
@@ -402,11 +449,11 @@ class RFDevice:
         """Busy-wait to achieve ~µs precision for RF timing."""
         target_ns = int(seconds * 1_000_000_000)
         start_ns = time.perf_counter_ns()
-        
+
         # Yield once for long waits, then busy-wait for precision
         if target_ns > 200_000:  # >0.2 ms
             time.sleep((target_ns - 100_000) / 1_000_000_000)  # leave ~0.1 ms
-            
+
         # Busy-wait for the remaining time to achieve microsecond precision
         while (time.perf_counter_ns() - start_ns) < target_ns:
             pass

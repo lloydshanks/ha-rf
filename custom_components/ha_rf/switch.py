@@ -21,12 +21,14 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .rf_device import RFDevice
+from .rf_receiver import RFReceiver
 
 _LOGGER = logging.getLogger(__name__)
 
 CONF_CODE_OFF = "code_off"
 CONF_CODE_ON = "code_on"
 CONF_GPIO = "gpio"
+CONF_RX_GPIO = "rx_gpio"
 CONF_PULSELENGTH = "pulselength"
 CONF_SIGNAL_REPETITIONS = "signal_repetitions"
 CONF_LENGTH = "length"
@@ -43,7 +45,9 @@ SWITCH_SCHEMA = vol.Schema(
         vol.Optional(
             CONF_SIGNAL_REPETITIONS, default=DEFAULT_SIGNAL_REPETITIONS
         ): cv.positive_int,
-        vol.Optional(CONF_PROTOCOL, default=DEFAULT_PROTOCOL): cv.positive_int,
+        vol.Optional(CONF_PROTOCOL, default=DEFAULT_PROTOCOL): vol.All(
+            cv.positive_int, vol.Range(min=1, max=6)
+        ),
         vol.Optional(CONF_LENGTH, default=DEFAULT_LENGTH): cv.positive_int,
         vol.Optional(CONF_UNIQUE_ID): cv.string,
     }
@@ -52,6 +56,7 @@ SWITCH_SCHEMA = vol.Schema(
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_GPIO): cv.positive_int,
+        vol.Optional(CONF_RX_GPIO): cv.positive_int,
         vol.Required(CONF_SWITCHES): vol.Schema({cv.string: SWITCH_SCHEMA}),
     }
 )
@@ -64,20 +69,20 @@ def setup_platform(
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Find and return switches controlled by a generic RF device via GPIO."""
-    import logging
-    _LOGGER = logging.getLogger(__name__)
-    
     gpio = config[CONF_GPIO]
     _LOGGER.info("Setting up ha_rf platform with GPIO %d", gpio)
-    
+
     try:
         rfdevice = RFDevice(gpio)
         _LOGGER.info("RFDevice initialized successfully")
     except Exception as err:
-        _LOGGER.error("Failed to initialize RFDevice: %s", err)
-        _LOGGER.error("This likely means gpiod is not available or GPIO permissions are insufficient")
+        _LOGGER.error(
+            "Failed to initialize RFDevice: %s "
+            "(likely gpiod missing or GPIO permissions insufficient)",
+            err,
+        )
         return
-        
+
     rfdevice_lock = RLock()
     switches = config[CONF_SWITCHES]
 
@@ -98,20 +103,38 @@ def setup_platform(
                 properties.get(CONF_CODE_OFF),
             )
         )
-    
-    if devices:
-        _LOGGER.info("Enabling TX for %d devices", len(devices))
-        try:
-            rfdevice.enable_tx()
-            _LOGGER.info("TX enabled successfully")
-        except Exception as err:
-            _LOGGER.error("Failed to enable TX: %s", err)
+
+    if not devices:
+        return
+
+    _LOGGER.info("Enabling TX for %d devices", len(devices))
+    try:
+        if not rfdevice.enable_tx():
+            _LOGGER.error("enable_tx() returned False; aborting platform setup")
             return
+    except Exception as err:
+        _LOGGER.error("Failed to enable TX: %s", err)
+        return
 
     _LOGGER.info("Adding %d entities to Home Assistant", len(devices))
     add_entities(devices)
 
-    hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, lambda event: rfdevice.cleanup())
+    receiver: RFReceiver | None = None
+    rx_gpio = config.get(CONF_RX_GPIO)
+    if rx_gpio is not None:
+        try:
+            receiver = RFReceiver(rx_gpio, rfdevice._gpio_chip_path)
+            receiver.start()
+        except Exception as err:
+            _LOGGER.error("Failed to start RX listener on GPIO %d: %s", rx_gpio, err)
+            receiver = None
+
+    def _shutdown(event) -> None:
+        if receiver is not None:
+            receiver.stop()
+        rfdevice.cleanup()
+
+    hass.bus.listen_once(EVENT_HOMEASSISTANT_STOP, _shutdown)
 
 
 class RPiRFSwitch(SwitchEntity):
@@ -172,7 +195,9 @@ class RPiRFSwitch(SwitchEntity):
         with self._lock:
             _LOGGER.info("Sending code(s): %s", code_list)
             for code in code_list:
-                if not self._rfdevice.tx_code(code, protocol, pulselength, length, signal_repetitions):
+                if not self._rfdevice.tx_code(
+                    code, protocol, pulselength, length, signal_repetitions
+                ):
                     _LOGGER.error("Failed to send code: %s", code)
                     return False
         return True
@@ -180,7 +205,11 @@ class RPiRFSwitch(SwitchEntity):
     def turn_on(self, **kwargs) -> None:
         """Turn the switch on."""
         if self._send_code(
-            self._code_on, self._protocol, self._pulselength, self._length, self._signal_repetitions
+            self._code_on,
+            self._protocol,
+            self._pulselength,
+            self._length,
+            self._signal_repetitions,
         ):
             self._state = True
             self.schedule_update_ha_state()
@@ -188,7 +217,11 @@ class RPiRFSwitch(SwitchEntity):
     def turn_off(self, **kwargs) -> None:
         """Turn the switch off."""
         if self._send_code(
-            self._code_off, self._protocol, self._pulselength, self._length, self._signal_repetitions
+            self._code_off,
+            self._protocol,
+            self._pulselength,
+            self._length,
+            self._signal_repetitions,
         ):
             self._state = False
             self.schedule_update_ha_state()
