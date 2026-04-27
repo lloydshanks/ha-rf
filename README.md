@@ -87,7 +87,7 @@ switch:
 The integration supports multiple RF protocols:
 
 - **Protocol 1** (default): 350μs pulse length
-- **Protocol 2**: 650μs pulse length  
+- **Protocol 2**: 650μs pulse length
 - **Protocol 3**: 100μs pulse length
 - **Protocol 4**: 380μs pulse length
 - **Protocol 5**: 500μs pulse length
@@ -115,7 +115,7 @@ To customize: Go to **Settings** → **Devices & Services** → **Entities**, fi
 
 1. Connect your 433/315MHz RF transmitter to your Raspberry Pi:
    - **VCC** → 3.3V or 5V
-   - **GND** → Ground  
+   - **GND** → Ground
    - **DATA** → GPIO pin (specified in configuration)
 
 2. Ensure your Home Assistant installation has GPIO access (typically requires running as root or in the `gpio` group)
@@ -165,7 +165,7 @@ This integration uses modern Python development practices:
 # Setup development environment
 uv sync
 
-# Run linting and formatting  
+# Run linting and formatting
 uv run ruff check .
 uv run ruff format .
 
@@ -180,10 +180,10 @@ uv run mypy custom_components/
 - **Fixed**: GPIO chip detection regression that prevented initialization
 - **Improved**: Robust GPIO detection following proven reference implementations
 
-### v2025.8.5 
+### v2025.8.5
 - **Enhanced**: RF protocol timing with microsecond precision for better reliability
 - **Added**: Per-entity signal repetitions and code length configuration
-- **Improved**: GPIO chip detection for Raspberry Pi 5 compatibility  
+- **Improved**: GPIO chip detection for Raspberry Pi 5 compatibility
 - **Fixed**: Parameter logic bugs in transmission code
 - **Added**: Explicit GPIO electrical settings for stable transmission
 
