@@ -149,7 +149,7 @@ class TestRPiRFSwitch:
             code_off=[1234568],
         )
         # Stub out the HA-side state update so unit tests don't need a hass instance
-        self.switch.schedule_update_ha_state = Mock()
+        self.switch.schedule_update_ha_state = Mock()  # type: ignore[method-assign]
 
     def test_switch_initialization(self):
         """Test switch initialization."""
@@ -232,7 +232,7 @@ class TestRPiRFSwitch:
             code_on=[1111111, 1111112],
             code_off=[2222221, 2222222],
         )
-        switch.schedule_update_ha_state = Mock()
+        switch.schedule_update_ha_state = Mock()  # type: ignore[method-assign]
 
         self.mock_rfdevice.tx_code.return_value = True
 

@@ -7,7 +7,10 @@ from threading import RLock
 
 import voluptuous as vol
 
-from homeassistant.components.switch import PLATFORM_SCHEMA, SwitchEntity
+from homeassistant.components.switch import (
+    PLATFORM_SCHEMA as PLATFORM_SCHEMA,
+)
+from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import (
     CONF_NAME,
     CONF_UNIQUE_ID,
@@ -122,14 +125,20 @@ def setup_platform(
     receiver: RFReceiver | None = None
     rx_gpio = config.get(CONF_RX_GPIO)
     if rx_gpio is not None:
-        try:
-            receiver = RFReceiver(rx_gpio, rfdevice._gpio_chip_path)
-            receiver.start()
-        except Exception as err:
-            _LOGGER.error("Failed to start RX listener on GPIO %d: %s", rx_gpio, err)
-            receiver = None
+        chip_path = rfdevice._gpio_chip_path
+        if chip_path is None:
+            _LOGGER.error("Cannot start RX listener: GPIO chip path unavailable")
+        else:
+            try:
+                receiver = RFReceiver(rx_gpio, chip_path)
+                receiver.start()
+            except Exception as err:
+                _LOGGER.error(
+                    "Failed to start RX listener on GPIO %d: %s", rx_gpio, err
+                )
+                receiver = None
 
-    def _shutdown(event) -> None:
+    def _shutdown(event: object) -> None:
         if receiver is not None:
             receiver.stop()
         rfdevice.cleanup()
@@ -197,13 +206,13 @@ class RPiRFSwitch(SwitchEntity):
                     return False
         return True
 
-    def turn_on(self, **kwargs) -> None:
+    def turn_on(self, **kwargs: object) -> None:
         """Turn the switch on."""
         if self._send_code(self._code_on):
             self._state = True
             self.schedule_update_ha_state()
 
-    def turn_off(self, **kwargs) -> None:
+    def turn_off(self, **kwargs: object) -> None:
         """Turn the switch off."""
         if self._send_code(self._code_off):
             self._state = False

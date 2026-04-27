@@ -19,6 +19,21 @@ test = [
     "pytest-homeassistant-custom-component>=0.13.0",
 ]
 
+[tool.mypy]
+explicit_package_bases = true
+namespace_packages = true
+
+[[tool.mypy.overrides]]
+module = ["homeassistant.*", "voluptuous", "voluptuous.*", "gpiod", "gpiod.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# Tests rely heavily on Mock and dynamic patching; full strict typing isn't
+# the right cost/value tradeoff there.
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"

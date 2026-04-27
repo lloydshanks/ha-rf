@@ -10,28 +10,36 @@ import logging
 import threading
 import time
 from collections import namedtuple
+from typing import TYPE_CHECKING
 
-try:
+_LOGGER = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
     import gpiod
-    from gpiod.line import Direction, Value, Bias, Drive
-except ImportError as err:
-    gpiod = None
-    Direction = None
-    Value = None
-    Bias = None
-    Drive = None
-    _LOGGER = logging.getLogger(__name__)
-    _LOGGER.warning(
-        "gpiod not available: %s. RF functionality will not work. "
-        "Install with: pip install gpiod>=2.3.0",
-        err,
-    )
+    from gpiod.line import Bias, Direction, Drive, Value
+
+    HAS_GPIOD = True
+else:
+    try:
+        import gpiod
+        from gpiod.line import Bias, Direction, Drive, Value
+
+        HAS_GPIOD = True
+    except ImportError as err:
+        # Bind to None at module level so tests can patch them and so that
+        # `RFDevice.__init__` can detect missing gpiod and raise cleanly.
+        gpiod = None
+        Bias = Direction = Drive = Value = None
+        HAS_GPIOD = False
+        _LOGGER.warning(
+            "gpiod not available: %s. RF functionality will not work. "
+            "Install with: pip install gpiod>=2.3.0",
+            err,
+        )
 
 MAX_CHANGES = 67
 MIN_PROTOCOL = 1
 MAX_PROTOCOL = 6
-
-_LOGGER = logging.getLogger(__name__)
 
 Protocol = namedtuple(
     "Protocol",
@@ -45,15 +53,14 @@ Protocol = namedtuple(
         "one_low",
     ],
 )
-PROTOCOLS = (
-    None,
-    Protocol(350, 1, 31, 1, 3, 3, 1),
-    Protocol(650, 1, 10, 1, 2, 2, 1),
-    Protocol(100, 30, 71, 4, 11, 9, 6),
-    Protocol(380, 1, 6, 1, 3, 3, 1),
-    Protocol(500, 6, 14, 1, 2, 2, 1),
-    Protocol(200, 1, 10, 1, 5, 1, 1),
-)
+PROTOCOLS: dict[int, Protocol] = {
+    1: Protocol(350, 1, 31, 1, 3, 3, 1),
+    2: Protocol(650, 1, 10, 1, 2, 2, 1),
+    3: Protocol(100, 30, 71, 4, 11, 9, 6),
+    4: Protocol(380, 1, 6, 1, 3, 3, 1),
+    5: Protocol(500, 6, 14, 1, 2, 2, 1),
+    6: Protocol(200, 1, 10, 1, 5, 1, 1),
+}
 
 
 class RFDevice:
@@ -71,7 +78,7 @@ class RFDevice:
         rx_tolerance: int = 80,
     ) -> None:
         """Initialize the RF device."""
-        if gpiod is None:
+        if not HAS_GPIOD:
             raise RuntimeError("gpiod is not available. Cannot initialize RF device.")
 
         self.gpio = gpio
@@ -83,9 +90,9 @@ class RFDevice:
             self.tx_pulselength = PROTOCOLS[tx_proto].pulselength
 
         # gpiod-specific attributes
-        self._gpio_chip = None
-        self._gpio_request = None
-        self._gpio_chip_path = None
+        self._gpio_chip: gpiod.Chip | None = None
+        self._gpio_request: gpiod.LineRequest | None = None
+        self._gpio_chip_path: str | None = None
         self.tx_repeat = tx_repeat
         self.tx_length = tx_length
         self.rx_enabled = False
@@ -96,11 +103,11 @@ class RFDevice:
         self._rx_change_count = 0
         self._rx_repeat_count = 0
         # successful RX values
-        self.rx_code = None
-        self.rx_code_timestamp = None
-        self.rx_proto = None
-        self.rx_bitlength = None
-        self.rx_pulselength = None
+        self.rx_code: int | None = None
+        self.rx_code_timestamp: int | None = None
+        self.rx_proto: int | None = None
+        self.rx_bitlength: int | None = None
+        self.rx_pulselength: int | None = None
 
         with self._gpio_lock:
             self._gpio_chip_path = self._find_gpio_chip_for_line(self.gpio)

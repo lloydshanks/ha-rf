@@ -8,6 +8,7 @@ from custom_components.ha_rf.rf_device import RFDevice
 class TestGPIOChipDetectionLogic:
     """Test GPIO chip detection logic without hardware dependencies."""
 
+    @patch("custom_components.ha_rf.rf_device.HAS_GPIOD", True)
     @patch("custom_components.ha_rf.rf_device.gpiod")
     def test_chip_search_order_logic(self, mock_gpiod):
         """Test that the chip search follows correct priority order."""
@@ -33,6 +34,7 @@ class TestGPIOChipDetectionLogic:
 
         assert test_search_order()
 
+    @patch("custom_components.ha_rf.rf_device.HAS_GPIOD", True)
     @patch("custom_components.ha_rf.rf_device.gpiod")
     def test_pinctrl_label_filtering(self, mock_gpiod):
         """Test that only pinctrl chips are considered."""

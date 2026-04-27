@@ -12,15 +12,23 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from typing import TYPE_CHECKING
 
-try:
+if TYPE_CHECKING:
     import gpiod
     from gpiod.line import Bias, Direction, Edge
-except ImportError:
-    gpiod = None
-    Bias = None
-    Direction = None
-    Edge = None
+
+    HAS_GPIOD = True
+else:
+    try:
+        import gpiod
+        from gpiod.line import Bias, Direction, Edge
+
+        HAS_GPIOD = True
+    except ImportError:
+        gpiod = None
+        Bias = Direction = Edge = None
+        HAS_GPIOD = False
 
 from .rf_device import MAX_CHANGES, PROTOCOLS
 
@@ -33,14 +41,14 @@ class RFReceiver:
     """Decodes RF pulse trains arriving on a GPIO line."""
 
     def __init__(self, gpio: int, chip_path: str, tolerance: int = 80) -> None:
-        if gpiod is None:
+        if not HAS_GPIOD:
             raise RuntimeError("gpiod is not available; cannot start RX listener")
         self._gpio = gpio
         self._chip_path = chip_path
         self._tolerance = tolerance
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        self._request = None
+        self._request: gpiod.LineRequest | None = None
         self._timings = [0] * (MAX_CHANGES + 1)
         self._last_ts = 0
         self._change_count = 0
@@ -79,11 +87,13 @@ class RFReceiver:
         _LOGGER.debug("RX listener stopped")
 
     def _loop(self) -> None:
+        assert self._request is not None  # set in start() before this thread runs
+        request = self._request
         self._next_heartbeat = time.monotonic() + HEARTBEAT_INTERVAL_S
         while not self._stop.is_set():
             try:
-                if self._request.wait_edge_events(timeout=0.5):
-                    for event in self._request.read_edge_events():
+                if request.wait_edge_events(timeout=0.5):
+                    for event in request.read_edge_events():
                         self._edges_since_heartbeat += 1
                         self._feed(event.timestamp_ns // 1000)
                 now = time.monotonic()
